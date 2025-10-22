@@ -1,1 +1,17 @@
 /dist
+/node_modules
+/.env
+.DS_Store
+/logs
+*.log
+.idea/
+.vscode/
+*.swp
+*.bak
+*.tmp
+/build
+/.cache
+/.next
+/out
+/.nuxt
+/.parcel-cache
