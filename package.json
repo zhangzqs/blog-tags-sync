@@ -1,5 +1,5 @@
 {
-  "name": "@zhangzqs/tag-sync",
+  "name": "@zhangzqs/blog-tag-sync",
   "version": "0.1.0",
   "private": true,
   "description": "Tag synchronization utility for Hexo blog posts with LLM assistance.",
