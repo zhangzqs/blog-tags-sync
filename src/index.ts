@@ -85,16 +85,18 @@ function buildStatistics(
   let totalTags = 0;
   let totalNewTags = 0;
 
+  // 统计成功处理的文章（来自 merges）
   for (const [path, merge] of merges.entries()) {
     processedPosts += 1;
     totalTags += merge.tags.length;
     totalNewTags += merge.added.length;
-    const response = responses.get(path);
-    if (response) {
-      llmCalls += 1;
-      if (response.error) {
-        llmFailures += 1;
-      }
+  }
+
+  // 统计 LLM 调用次数和失败次数（来自 responses，包含失败的文章）
+  for (const [, response] of responses.entries()) {
+    llmCalls += 1;
+    if (response.error) {
+      llmFailures += 1;
     }
   }
 

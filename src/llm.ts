@@ -154,15 +154,32 @@ export async function generateTags(
             }
             const prompt = buildPrompt(post, config.language, historyTags);
             const response = await callChatCompletion(config, prompt);
+
+            // 如果 LLM 返回了错误（如网络故障、HTTP 错误等），应重试而非直接放弃
+            if (response.error) {
+              lastError = response.error;
+              attempt += 1;
+              if (attempt <= retries) {
+                logger.warn?.(
+                  `LLM call for ${post.relativePath} failed (attempt ${attempt}/${retries + 1}): ${response.error.message}. Retrying...`
+                );
+                continue;
+              }
+              logger.warn?.(
+                `LLM call for ${post.relativePath} failed after ${retries + 1} attempts: ${response.error.message}`
+              );
+              // 所有重试已耗尽，记录结果但不持久化到 tags.json，
+              // 以便下次增量运行时可以重新尝试
+              results.set(post.relativePath, response);
+              return;
+            }
+
+            // 成功：合并标签并持久化
             results.set(post.relativePath, response);
             const merged = mergeTags(post.frontMatterTags, response.tags, historyTags, config);
             merges.set(post.relativePath, merged);
             historicalTagsMap[post.relativePath] = merged.tags;
             await options.onPostProcessed?.(post, merged);
-            if (response.error) {
-              lastError = response.error;
-              logger.warn?.(`LLM call for ${post.relativePath} failed: ${response.error.message}`);
-            }
             return;
           } catch (error) {
             lastError = error instanceof Error ? error : new Error(String(error));
@@ -170,13 +187,11 @@ export async function generateTags(
             attempt += 1;
           }
         }
+        // 所有重试（包括异常和错误响应）已耗尽，不调用 onPostProcessed，
+        // 避免将空标签写入 tags.json 导致下次增量运行时被跳过
         if (lastError) {
           results.set(post.relativePath, { tags: [], raw: null, error: lastError });
-          const fallbackMerge = mergeTags(post.frontMatterTags, [], historyTags, config);
-          merges.set(post.relativePath, fallbackMerge);
-          historicalTagsMap[post.relativePath] = fallbackMerge.tags;
-          await options.onPostProcessed?.(post, fallbackMerge);
-          logger.error?.(`LLM generation failed for ${post.relativePath}: ${lastError.message}`);
+          logger.error?.(`LLM generation failed for ${post.relativePath} after ${retries + 1} attempts: ${lastError.message}`);
         }
       })
     )
